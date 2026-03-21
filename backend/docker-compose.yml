@@ -1,0 +1,102 @@
+# PesaLoop — full stack docker-compose
+#
+# Uses your locally-installed PostgreSQL via host.docker.internal.
+# All variables below are read from .env (copy from .env.example first).
+#
+# Usage:
+#   cp .env.example .env          # first time only
+#   docker-compose up --build     # first run — builds the image
+#   docker-compose up             # subsequent runs (no rebuild)
+#   docker-compose up --build api # rebuild only api after code changes
+#   docker-compose down           # stop and remove containers
+#   docker-compose logs -f api    # tail api logs
+#
+# pgAdmin (optional DB browser):
+#   docker-compose --profile tools up
+#   Open http://localhost:5050
+#   Add server: host=host.docker.internal, port=5432, db=pesaloop
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: pesaloop-api
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+    environment:
+      # ── Spring profile ────────────────────────────────────────────────────
+      SPRING_PROFILES_ACTIVE: docker
+
+      # ── Database ─────────────────────────────────────────────────────────
+      # host.docker.internal resolves to your host machine from inside Docker.
+      # The app reads DB_URL/DB_USERNAME/DB_PASSWORD — these map directly to
+      # the ${DB_URL}, ${DB_USERNAME}, ${DB_PASSWORD} placeholders in application.yml.
+      DB_URL: jdbc:postgresql://host.docker.internal:${POSTGRES_PORT:-5430}/${POSTGRES_DB:-pesaLoop}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-mwas}
+
+      # ── Auth ──────────────────────────────────────────────────────────────
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-at-least-64-chars-for-hs512-algorithm}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      JWT_REFRESH_EXPIRY_DAYS: ${JWT_REFRESH_EXPIRY_DAYS:-30}
+
+      # ── Server ────────────────────────────────────────────────────────────
+      SERVER_PORT: 8080
+
+      # ── M-Pesa ────────────────────────────────────────────────────────────
+      MPESA_ENV: ${MPESA_ENV:-sandbox}
+      MPESA_BASE_URL: ${MPESA_BASE_URL:-https://sandbox.safaricom.co.ke}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET:-}
+      MPESA_PASSKEY: ${MPESA_PASSKEY:-}
+      MPESA_CALLBACK_BASE_URL: ${MPESA_CALLBACK_BASE_URL:-https://api.pesaloop.co.ke}
+      MPESA_WEBHOOK_IP_CHECK: ${MPESA_WEBHOOK_IP_CHECK:-false}
+
+      # ── SMS ───────────────────────────────────────────────────────────────
+      SMS_PROVIDER: ${SMS_PROVIDER:-africastalking}
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      SMS_USERNAME: ${SMS_USERNAME:-sandbox}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-PesaLoop}
+
+      # ── Billing ───────────────────────────────────────────────────────────
+      PESALOOP_BILLING_PAYBILL: ${PESALOOP_BILLING_PAYBILL:-123456}
+
+      # ── Logging ───────────────────────────────────────────────────────────
+      LOGGING_LEVEL_COM_PESALOOP: ${LOG_LEVEL:-INFO}
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── pgAdmin ─────────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pesaloop-pgadmin
+    restart: unless-stopped
+    profiles: ["tools"]
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@pesaloop.app}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  pgadmin_data:
+    name: pesaloop-pgadmin-data

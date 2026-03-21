@@ -1,0 +1,20 @@
+# Profile: docker
+# Active when SPRING_PROFILES_ACTIVE=docker (set in docker-compose.yml).
+# Overrides only what is meaningfully different inside a container.
+
+logging:
+  level:
+    com.pesaloop: ${LOGGING_LEVEL_COM_PESALOOP:INFO}
+    org.flywaydb: INFO           # show migration progress on container start
+  pattern:
+    # JSON-style is easier to parse with log aggregators (CloudWatch, Datadog, etc.)
+    console: "{\"time\":\"%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}\",\"level\":\"%level\",\"logger\":\"%logger{36}\",\"msg\":\"%msg\"}%n"
+
+# Slightly longer Hikari timeout — container networking adds a small RTT
+spring:
+  datasource:
+    hikari:
+      connection-timeout: 45000
+      initialization-fail-timeout: 120000   # wait up to 2 min for DB on startup
+  flyway:
+    repair-on-migrate: true

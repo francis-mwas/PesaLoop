@@ -1,0 +1,129 @@
+spring:
+  application:
+    name: pesaloop
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5430/pesaLoop}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:mwas}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate         # Flyway owns the schema — Hibernate only validates
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    out-of-order: false
+
+  # Redis removed — re-add when OTP caching or sessions are needed
+  # data:
+  #   redis:
+  #     host: ${REDIS_HOST:localhost}
+  #     port: ${REDIS_PORT:6379}
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+
+# ── PesaLoop application config ──────────────────────────────────────────────
+pesaloop:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-use-at-least-64-chars-for-hs512-algorithm}
+    expiry-hours: ${JWT_EXPIRY_HOURS:24}
+    refresh-expiry-days: ${JWT_REFRESH_EXPIRY_DAYS:30}
+
+  mpesa:
+    consumer-key: ${MPESA_CONSUMER_KEY:}
+    consumer-secret: ${MPESA_CONSUMER_SECRET:}
+    passkey: ${MPESA_PASSKEY:}
+    environment: ${MPESA_ENV:sandbox}
+    base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
+    callback-base-url: ${MPESA_CALLBACK_BASE_URL:https://api.pesaloop.co.ke}
+    webhook-ip-check-enabled: ${MPESA_WEBHOOK_IP_CHECK:true}
+
+  billing:
+    paybill: ${PESALOOP_BILLING_PAYBILL:123456}  # PesaLoop's own M-Pesa paybill number
+
+  sms:
+    provider: ${SMS_PROVIDER:africastalking}  # africastalking | infobip
+    api-key: ${SMS_API_KEY:}
+    username: ${SMS_USERNAME:sandbox}
+    sender-id: ${SMS_SENDER_ID:PesaLoop}
+
+  scheduler:
+    interest-accrual-cron: "0 0 1 * * *"     # 1:00 AM daily
+    overdue-check-cron: "0 30 6 * * *"        # 6:30 AM daily
+    cycle-generation-cron: "0 0 2 1 * *"      # 2:00 AM on 1st of every month
+    reminder-sms-cron: "0 0 8 * * *"          # 8:00 AM daily
+
+  platform:
+    trial-period-days: 30
+    price-per-member-kes: 50
+    free-sms-units-per-month: 150
+    price-per-sms-kes: 1
+
+# ── Actuator & Monitoring ─────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.pesaloop: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ── Swagger / OpenAPI ─────────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+    default-models-expand-depth: 1
+    try-it-out-enabled: true
+  show-actuator: false

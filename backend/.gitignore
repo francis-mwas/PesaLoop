@@ -1,0 +1,108 @@
+# ==========================================================
+# JAVA / SPRING BOOT
+# ==========================================================
+
+# Compiled files
+*.class
+
+# Logs
+*.log
+logs/
+
+# Package artifacts
+*.jar
+*.war
+*.ear
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# ==========================================================
+# MAVEN
+# ==========================================================
+
+# Build directory
+/target/
+
+# Maven metadata
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+
+# Maven wrapper (optional — commit wrapper if team project)
+.mvn/wrapper/maven-wrapper.jar
+
+# ==========================================================
+# INTELLIJ IDEA
+# ==========================================================
+
+.idea/
+*.iml
+*.iws
+*.ipr
+/out/
+
+# ==========================================================
+# DOCKER
+# ==========================================================
+
+# Local docker volumes
+docker-data/
+*.pid
+
+# Docker override files (optional)
+docker-compose.override.yml
+
+# ==========================================================
+# ENVIRONMENT / SECRETS (CRITICAL)
+# ==========================================================
+
+.env
+.env.*
+*.env
+
+# Spring profile overrides
+application-local.yml
+application-local.properties
+application-dev.yml
+application-dev.properties
+application-test.yml
+application-test.properties
+application-prod.yml
+application-prod.properties
+
+# Keystores / certs
+*.jks
+*.p12
+*.pem
+*.key
+
+# ==========================================================
+# OS FILES
+# ==========================================================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# ==========================================================
+# TEST OUTPUT / COVERAGE
+# ==========================================================
+
+coverage/
+*.lcov
+
+# ==========================================================
+# MISC
+# ==========================================================
+
+*.tmp
+*.temp

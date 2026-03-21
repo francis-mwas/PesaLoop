@@ -1,0 +1,744 @@
+{
+  "info": {
+    "name": "PesaLoop API — Full Test Suite",
+    "description": "Complete API test collection covering all scenarios. Import into Postman or use with Bruno (https://www.usebruno.com).\n\nSeed data password: test1234\nBase URL: http://localhost:8080",
+    "version": "1.0.0"
+  },
+  "variable": [
+    { "key": "BASE_URL",     "value": "http://localhost:8080" },
+    { "key": "TOKEN_ALICE",  "value": "" },
+    { "key": "TOKEN_BRIAN",  "value": "" },
+    { "key": "GROUP_ID_1",   "value": "22222222-0000-0000-0000-000000000001" },
+    { "key": "GROUP_ID_SUSPENDED", "value": "22222222-0000-0000-0000-000000000004" }
+  ],
+  "item": [
+
+    {
+      "name": "01 — Authentication",
+      "item": [
+        {
+          "name": "Register new user",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254700009999\",\n  \"fullName\": \"Test New User\",\n  \"password\": \"test1234\",\n  \"email\": \"newuser@test.co.ke\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "pm.test('Has userId', () => pm.expect(pm.response.json().data.userId).to.exist);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/auth/otp/send",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254700009999\",\n  \"purpose\": \"REGISTRATION\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login — Alice (Group 1 admin)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254712000001\",\n  \"password\": \"test1234\",\n  \"groupId\": \"22222222-0000-0000-0000-000000000001\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const body = pm.response.json();",
+                "pm.test('Has token', () => pm.expect(body.data.token).to.exist);",
+                "pm.collectionVariables.set('TOKEN_ALICE', body.data.token);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Login — multi-group (no groupId, expect group list)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254712000001\",\n  \"password\": \"test1234\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const body = pm.response.json();",
+                "pm.test('Has available groups', () => pm.expect(body.data.availableGroups.length).to.be.above(0));",
+                "pm.test('No token yet', () => pm.expect(body.data.token).to.be.null);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get my groups",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/auth/my-groups",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has groups', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "02 — Group & Member Management",
+      "item": [
+        {
+          "name": "Create new group",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/groups",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kisumu Investment Club\",\n  \"groupType\": \"INVESTMENT\",\n  \"currencyCode\": \"KES\",\n  \"contributionFrequency\": \"MONTHLY\",\n  \"shareConfig\": {\n    \"pricePerShare\": 5000,\n    \"minimumShares\": 1,\n    \"maximumShares\": 10,\n    \"sharesMode\": true\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Add member — existing PesaLoop user",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/members",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254722000002\",\n  \"fullName\": \"Brian Mwangi Kahara\",\n  \"role\": \"MEMBER\",\n  \"sharesOwned\": 5\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201 or 409 if already member', () => pm.expect([201,409]).to.include(pm.response.code));",
+                "if (pm.response.code === 201) {",
+                "  pm.test('isNewUser false — phone already registered', () =>",
+                "    pm.expect(pm.response.json().data.isNewUser).to.be.false);",
+                "}"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Add member — new user (triggers invite SMS)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/members",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254700009888\",\n  \"fullName\": \"New Member Completely Fresh\",\n  \"role\": \"MEMBER\",\n  \"sharesOwned\": 3,\n  \"nextOfKinName\": \"Spouse Name\",\n  \"nextOfKinPhone\": \"254711111111\",\n  \"nextOfKinRelationship\": \"SPOUSE\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "pm.test('isNewUser true', () =>",
+                "  pm.expect(pm.response.json().data.isNewUser).to.be.true);",
+                "pm.test('inviteSent true', () =>",
+                "  pm.expect(pm.response.json().data.inviteSent).to.be.true);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "List all members",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/members",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has members', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "03 — Contributions",
+      "item": [
+        {
+          "name": "Get current cycle summary",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/contributions/cycles/55555555-0000-0000-0001-000000000004/summary",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const s = pm.response.json().data;",
+                "pm.test('totalExpected = 222000', () => pm.expect(s.totalExpected).to.equal(222000));",
+                "pm.test('2 paid members', () => pm.expect(s.paidCount).to.equal(2));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Record manual cash payment — Catherine partial",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/contributions/manual",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": \"33333333-0000-0000-0001-000000000003\",\n  \"cycleId\": \"55555555-0000-0000-0001-000000000004\",\n  \"amount\": 12000,\n  \"paymentMethod\": \"CASH\",\n  \"reference\": \"RCPT-2025-001\",\n  \"notes\": \"Collected at January meeting\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const e = pm.response.json().data;",
+                "pm.test('Paid amount increased', () => pm.expect(e.paidAmount).to.equal(39000));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Initiate STK Push — Esther",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/contributions/stk-push",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": \"33333333-0000-0000-0001-000000000005\",\n  \"cycleId\": \"55555555-0000-0000-0001-000000000004\",\n  \"amount\": 12000,\n  \"phoneNumber\": \"254711000005\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "// This will fail without real M-Pesa credentials",
+                "// In dev: check that request was saved to stk_push_requests",
+                "pm.test('Status 200 or 500', () =>",
+                "  pm.expect([200, 500]).to.include(pm.response.code));"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "04 — Loans",
+      "item": [
+        {
+          "name": "Apply for loan — Catherine (eligible)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/loans/applications",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"44444444-0000-0000-0001-000000000001\",\n  \"amount\": 50000,\n  \"repaymentPeriods\": 3,\n  \"applicationNote\": \"School fees payment\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const d = pm.response.json().data;",
+                "pm.test('Eligible', () => pm.expect(d.eligible).to.be.true);",
+                "pm.collectionVariables.set('LOAN_ID_CATHERINE', d.loanId);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Apply for loan — ineligible (Esther has arrears)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/loans/applications",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"44444444-0000-0000-0001-000000000001\",\n  \"amount\": 20000,\n  \"applicationNote\": \"Business capital\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                "pm.test('Has ineligibility reason', () =>",
+                "  pm.expect(pm.response.json().error).to.contain('arrears'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Approve loan — Catherine",
+          "request": {
+            "method": "PUT",
+            "url": "{{BASE_URL}}/api/v1/loans/applications/{{LOAN_ID_CATHERINE}}/process",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanId\": \"{{LOAN_ID_CATHERINE}}\",\n  \"decision\": \"APPROVE\",\n  \"note\": \"Approved — good repayment history\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Issue disbursement instruction — Catherine",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/loans/{{LOAN_ID_CATHERINE}}/disburse",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const d = pm.response.json().data;",
+                "pm.test('Status PENDING_DISBURSEMENT', () =>",
+                "  pm.expect(d.status).to.equal('PENDING_DISBURSEMENT'));",
+                "// mpesaConversationId now holds the instruction UUID",
+                "pm.collectionVariables.set('INSTRUCTION_ID_CATHERINE', d.mpesaConversationId);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get pending disbursements queue",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/disbursements/pending",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has pending instructions', () =>",
+                "  pm.expect(pm.response.json().data.length).to.be.above(0));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Confirm disbursement — treasurer enters M-Pesa ref",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/disbursements/{{INSTRUCTION_ID_CATHERINE}}/confirm",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mpesaReference\": \"QWE456XYZ9\",\n  \"notes\": \"Sent from Equity Bank paybill\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Loan activated', () =>",
+                "  pm.expect(pm.response.json().data.effect).to.contain('activated'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Record loan repayment — Alice (manual)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/loans/77777777-0000-0001-0000-000000000001/repayments",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanId\": \"77777777-0000-0001-0000-000000000001\",\n  \"amount\": 36666.67,\n  \"paymentMethod\": \"MANUAL_CASH\",\n  \"notes\": \"Monthly instalment\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Loan book — active loans",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/loans?status=ACTIVE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "05 — Payment Accounts",
+      "item": [
+        {
+          "name": "List payment accounts",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/payment-accounts",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has paybill account', () => {",
+                "  const accounts = pm.response.json().data;",
+                "  pm.expect(accounts.some(a => a.accountType === 'MPESA_PAYBILL')).to.be.true;",
+                "});"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Add Equity Bank account",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/payment-accounts",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountType\": \"BANK_ACCOUNT\",\n  \"provider\": \"EQUITY_BANK\",\n  \"accountNumber\": \"0111234567890\",\n  \"accountName\": \"Wanjiku Table Banking — Equity\",\n  \"bankBranch\": \"Westlands\",\n  \"isCollection\": true,\n  \"isDisbursement\": false,\n  \"isPrimary\": false,\n  \"displayLabel\": \"Equity Bank — for diaspora and large transfers\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get subscription status",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/payment-accounts/subscription",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Status ACTIVE', () =>",
+                "  pm.expect(pm.response.json().data.status).to.equal('ACTIVE'));"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "06 — Subscription Access Control",
+      "item": [
+        {
+          "name": "Login as suspended group admin",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254777000008\",\n  \"password\": \"test1234\",\n  \"groupId\": \"22222222-0000-0000-0000-000000000004\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
+                "pm.collectionVariables.set('TOKEN_SUSPENDED', pm.response.json().data.token);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Write blocked — 402 for suspended group",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/contributions/manual",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_SUSPENDED}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": \"33333333-0000-0000-0004-000000000001\",\n  \"cycleId\": \"00000000-0000-0000-0000-000000000000\",\n  \"amount\": 5000,\n  \"paymentMethod\": \"CASH\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 402 Payment Required', () => pm.response.to.have.status(402));",
+                "const body = pm.response.json();",
+                "pm.test('Has paymentDetails', () => pm.expect(body.paymentDetails).to.exist);",
+                "pm.test('Has paybill number', () => pm.expect(body.paymentDetails.paybill).to.equal('123456'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Read still works — GET members for suspended group",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/members",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_SUSPENDED}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200 — reads always work', () => pm.response.to.have.status(200));"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "07 — M-Pesa Webhooks (simulate Safaricom callbacks)",
+      "item": [
+        {
+          "name": "STK Push callback — success",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/webhooks/mpesa/stk/callback",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Body\": {\n    \"stkCallback\": {\n      \"MerchantRequestID\": \"29115-34620561-1\",\n      \"CheckoutRequestID\": \"ws_CO_191220191020363925\",\n      \"ResultCode\": 0,\n      \"ResultDesc\": \"The service request is processed successfully.\",\n      \"CallbackMetadata\": {\n        \"Item\": [\n          { \"Name\": \"Amount\",               \"Value\": 12000 },\n          { \"Name\": \"MpesaReceiptNumber\",    \"Value\": \"NLJ7RT61SV\" },\n          { \"Name\": \"TransactionDate\",       \"Value\": 20250115103033 },\n          { \"Name\": \"PhoneNumber\",           \"Value\": 254711000005 }\n        ]\n      }\n    }\n  }\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('ResultCode 0', () =>",
+                "  pm.expect(pm.response.json().ResultCode).to.equal('0'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "C2B confirmation — member pays paybill directly",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/webhooks/mpesa/c2b/confirmation",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"TransactionType\": \"Pay Bill\",\n  \"TransID\": \"LGR219G3EY\",\n  \"TransAmount\": \"39000.00\",\n  \"BusinessShortCode\": \"522533\",\n  \"BillRefNumber\": \"M-003\",\n  \"MSISDN\": \"254733000003\",\n  \"FirstName\": \"Catherine\",\n  \"LastName\": \"Kamau\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('ResultCode 0', () =>",
+                "  pm.expect(pm.response.json().ResultCode).to.equal('0'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "C2B — unmatched payment (wrong account ref)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/webhooks/mpesa/c2b/confirmation",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"TransactionType\": \"Pay Bill\",\n  \"TransID\": \"UNMATCHED999\",\n  \"TransAmount\": \"5000.00\",\n  \"BusinessShortCode\": \"522533\",\n  \"BillRefNumber\": \"WRONG-REF\",\n  \"MSISDN\": \"254700000000\",\n  \"FirstName\": \"Unknown\",\n  \"LastName\": \"Person\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "// Safaricom always gets 200 — we handle unmatched internally",
+                "pm.test('Status 200', () => pm.response.to.have.status(200));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Check unmatched payments queue",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/v1/payments/unmatched",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has unmatched payment', () =>",
+                "  pm.expect(pm.response.json().data.length).to.be.above(0));"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+
+    {
+      "name": "08 — Validation Edge Cases",
+      "item": [
+        {
+          "name": "Bad phone — invalid format",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"0712ABC456\",\n  \"fullName\": \"Test\",\n  \"password\": \"test1234\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                "pm.test('Has INVALID_PHONE code', () =>",
+                "  pm.expect(pm.response.json().code).to.equal('INVALID_PHONE'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Duplicate phone registration",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"254712000001\",\n  \"fullName\": \"Alice Again\",\n  \"password\": \"test1234\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                "pm.test('PHONE_EXISTS code', () =>",
+                "  pm.expect(pm.response.json().code).to.equal('PHONE_EXISTS'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Overpayment rejected",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/api/v1/contributions/manual",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_ALICE}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": \"33333333-0000-0000-0001-000000000001\",\n  \"cycleId\": \"55555555-0000-0000-0001-000000000004\",\n  \"amount\": 9999999,\n  \"paymentMethod\": \"CASH\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 400 or 409', () =>",
+                "  pm.expect([400, 409]).to.include(pm.response.code));"
+              ]
+            }
+          }]
+        }
+      ]
+    }
+
+  ]
+}
