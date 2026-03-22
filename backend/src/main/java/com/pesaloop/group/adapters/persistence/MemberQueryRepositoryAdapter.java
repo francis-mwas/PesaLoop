@@ -19,7 +19,13 @@ public class MemberQueryRepositoryAdapter implements MemberQueryRepository {
 
     private static final String MEMBER_SUMMARY_SELECT = """
             SELECT m.id, m.member_number, u.full_name, u.phone_number,
-                   m.role, m.status, m.shares_owned, m.savings_balance,
+                   m.role, m.status, m.shares_owned,
+                   COALESCE(
+                       (SELECT SUM(ce.paid_amount)
+                          FROM contribution_entries ce
+                         WHERE ce.member_id = m.id AND ce.group_id = m.group_id),
+                       m.savings_balance
+                   ) AS savings_balance,
                    m.arrears_balance, m.fines_balance, m.joined_on,
                    g.share_price_amount,
                    (SELECT COUNT(*) FROM loan_accounts la
@@ -68,7 +74,7 @@ public class MemberQueryRepositoryAdapter implements MemberQueryRepository {
 
     @Override
     public void updateShares(UUID memberId, UUID groupId, int newShares,
-                              UUID approvedByUserId, String reason) {
+                             UUID approvedByUserId, String reason) {
         jdbc.update(
                 """
                 INSERT INTO member_share_changes

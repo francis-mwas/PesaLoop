@@ -1,6 +1,10 @@
 package com.pesaloop.contribution.adapters.web;
 
+import com.pesaloop.contribution.application.port.in.GetGroupStatsPort;
+import com.pesaloop.contribution.application.port.in.GetGroupStatsPort.GroupStatsResult;
 import com.pesaloop.contribution.application.port.in.GetMonthlyLedgerPort;
+import com.pesaloop.contribution.application.port.in.GetYearSummaryPort;
+import com.pesaloop.contribution.application.port.in.GetYearSummaryPort.YearSummaryResult;
 import com.pesaloop.contribution.application.port.out.MemberStatementRepository;
 import com.pesaloop.contribution.application.port.out.MemberStatementRepository.*;
 import com.pesaloop.contribution.application.usecase.MonthlyLedgerUseCase.MonthlyLedgerResponse;
@@ -13,22 +17,28 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Primary adapter — reports for the treasurer.
- * No SQL in this class — all data access through output port interfaces.
+ * Primary adapter — HTTP interface for financial reports.
+ * No SQL, no JdbcTemplate, no business logic.
+ * Delegates everything to input ports (use cases) and output ports (repositories).
  */
-@Tag(name = "Reports", description = "Monthly ledger, member statements, loan book")
+@Tag(name = "Reports", description = "Monthly ledger, member statements, loan book, group earnings")
 @RestController
 @RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
-    private final GetMonthlyLedgerPort monthlyLedgerUseCase;
+    private final GetMonthlyLedgerPort    monthlyLedgerUseCase;
+    private final GetGroupStatsPort       groupStatsUseCase;
+    private final GetYearSummaryPort      yearSummaryUseCase;
     private final MemberStatementRepository memberStatementRepository;
+
+    // ── Monthly ledger ────────────────────────────────────────────────────
 
     @GetMapping("/monthly-ledger")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR')")
@@ -38,18 +48,22 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.success(monthlyLedgerUseCase.execute(ym)));
     }
 
+    // ── Member statement ──────────────────────────────────────────────────
+
     @GetMapping("/member/{memberId}/statement")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR')")
     public ResponseEntity<ApiResponse<MemberStatement>> memberStatement(
             @PathVariable UUID memberId) {
         UUID groupId = TenantContext.getGroupId();
-        MemberProfile profile = memberStatementRepository.findMemberProfile(memberId, groupId);
+        MemberProfile        profile       = memberStatementRepository.findMemberProfile(memberId, groupId);
         List<ContributionLine> contributions = memberStatementRepository.findContributions(memberId, groupId);
-        List<LoanLine> loans = memberStatementRepository.findLoans(memberId, groupId);
-        List<RepaymentLine> repayments = memberStatementRepository.findRepayments(memberId, groupId);
+        List<LoanLine>         loans         = memberStatementRepository.findLoans(memberId, groupId);
+        List<RepaymentLine>    repayments    = memberStatementRepository.findRepayments(memberId, groupId);
         return ResponseEntity.ok(ApiResponse.success(
                 new MemberStatement(memberId, profile, contributions, loans, repayments)));
     }
+
+    // ── Loan book ─────────────────────────────────────────────────────────
 
     @GetMapping("/loan-book")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR')")
@@ -61,11 +75,39 @@ public class ReportController {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return ResponseEntity.ok(ApiResponse.success(book,
                 book.size() + " active loans · Total outstanding: KES " +
-                String.format("%,.0f", total)));
+                        String.format("%,.0f", total)));
     }
 
-    record MemberStatement(UUID memberId, MemberProfile profile,
-                           List<ContributionLine> contributions,
-                           List<LoanLine> loans,
-                           List<RepaymentLine> repayments) {}
+    // ── Group stats (contributions banner) ───────────────────────────────
+
+    @GetMapping("/group-stats")
+    @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR','MEMBER')")
+    public ResponseEntity<ApiResponse<GroupStatsResult>> groupStats() {
+        UUID groupId = TenantContext.getGroupId();
+        int  year    = LocalDate.now().getYear();
+        return ResponseEntity.ok(ApiResponse.success(
+                groupStatsUseCase.execute(groupId, year)));
+    }
+
+    // ── Year-end earnings summary (dashboard) ─────────────────────────────
+
+    @GetMapping("/year-summary")
+    @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR','MEMBER')")
+    public ResponseEntity<ApiResponse<YearSummaryResult>> yearSummary(
+            @RequestParam(required = false) Integer year) {
+        UUID groupId   = TenantContext.getGroupId();
+        int targetYear = year != null ? year : LocalDate.now().getYear();
+        return ResponseEntity.ok(ApiResponse.success(
+                yearSummaryUseCase.execute(groupId, targetYear)));
+    }
+
+    // ── Response wrapper records (controller-layer DTOs) ─────────────────
+
+    record MemberStatement(
+            UUID memberId,
+            MemberProfile profile,
+            List<ContributionLine> contributions,
+            List<LoanLine> loans,
+            List<RepaymentLine> repayments
+    ) {}
 }

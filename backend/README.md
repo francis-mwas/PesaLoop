@@ -356,3 +356,16 @@ All passwords: **`test1234`**
 | `POST /webhooks/mpesa/stk/callback` | None | STK Push result callback |
 
 Full interactive docs: **http://localhost:8080/swagger-ui.html**
+
+
+![img.png](img.png)``HTTP Request
+    ↓
+ReportController (primary adapter)     ← translates HTTP, calls ports
+    ↓ calls
+GetYearSummaryPort (input port)        ← interface boundary
+    ↓ implemented by
+GetYearSummaryUseCase (use case)       ← business logic lives here (dividendPerShare calc)
+    ↓ calls
+GroupStatsRepository (output port)    ← interface boundary
+    ↓ implemented by
+GroupStatsJdbcAdapter (secondary adapter) ← SQL lives here, nowhere else``

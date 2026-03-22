@@ -22,12 +22,17 @@ public class ContributionCycleManagementAdapter implements ContributionCycleMana
     public List<CycleSummaryRow> findCyclesByGroup(UUID groupId) {
         return jdbc.query(
                 """
-                SELECT id, cycle_number, financial_year, due_date, grace_period_end,
-                       status, total_expected_amount, total_collected_amount,
-                       mgr_beneficiary_id, mgr_payout_amount, mgr_paid_out_at
-                  FROM contribution_cycles
-                 WHERE group_id = ?
-                 ORDER BY financial_year DESC, cycle_number DESC
+                SELECT cc.id, cc.cycle_number, cc.financial_year, cc.due_date, cc.grace_period_end,
+                       cc.status, cc.total_expected_amount,
+                       COALESCE(SUM(ce.paid_amount), cc.total_collected_amount) AS total_collected_amount,
+                       cc.mgr_beneficiary_id, cc.mgr_payout_amount, cc.mgr_paid_out_at
+                  FROM contribution_cycles cc
+                  LEFT JOIN contribution_entries ce ON ce.cycle_id = cc.id
+                 WHERE cc.group_id = ?
+                 GROUP BY cc.id, cc.cycle_number, cc.financial_year, cc.due_date,
+                          cc.grace_period_end, cc.status, cc.total_expected_amount,
+                          cc.mgr_beneficiary_id, cc.mgr_payout_amount, cc.mgr_paid_out_at
+                 ORDER BY cc.financial_year DESC, cc.cycle_number DESC
                 """,
                 (rs, row) -> new CycleSummaryRow(
                         UUID.fromString(rs.getString("id")),
@@ -48,7 +53,7 @@ public class ContributionCycleManagementAdapter implements ContributionCycleMana
 
     @Override
     public void setMgrBeneficiary(UUID cycleId, UUID groupId,
-                                   UUID memberId, BigDecimal payoutAmount) {
+                                  UUID memberId, BigDecimal payoutAmount) {
         int updated = jdbc.update(
                 """
                 UPDATE contribution_cycles
@@ -71,7 +76,7 @@ public class ContributionCycleManagementAdapter implements ContributionCycleMana
     @Override
     @Transactional
     public OpenCycleResult openCycle(UUID groupId, LocalDate dueDate,
-                                      int graceDays, UUID mgrBeneficiaryId) {
+                                     int graceDays, UUID mgrBeneficiaryId) {
         int year = LocalDate.now().getYear();
 
         Integer lastCycle = jdbc.queryForObject(

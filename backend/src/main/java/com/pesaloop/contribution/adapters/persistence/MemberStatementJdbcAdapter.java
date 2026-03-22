@@ -5,8 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -24,11 +23,16 @@ public class MemberStatementJdbcAdapter implements MemberStatementRepository {
                 """
                 SELECT m.member_number, u.full_name, u.phone_number,
                        m.shares_owned, g.share_price_amount,
-                       m.savings_balance, m.arrears_balance, m.fines_balance, m.joined_on
+                       COALESCE(SUM(ce.paid_amount), m.savings_balance) AS savings_balance,
+                       m.arrears_balance, m.fines_balance, m.joined_on
                   FROM members m
                   JOIN users u ON u.id = m.user_id
                   JOIN groups g ON g.id = m.group_id
+             LEFT JOIN contribution_entries ce ON ce.member_id = m.id AND ce.group_id = m.group_id
                  WHERE m.id = ? AND m.group_id = ?
+                 GROUP BY m.member_number, u.full_name, u.phone_number,
+                          m.shares_owned, g.share_price_amount,
+                          m.savings_balance, m.arrears_balance, m.fines_balance, m.joined_on
                 """,
                 (rs, row) -> new MemberProfile(
                         rs.getString("member_number"), rs.getString("full_name"),
@@ -44,7 +48,8 @@ public class MemberStatementJdbcAdapter implements MemberStatementRepository {
         return jdbc.query(
                 """
                 SELECT cc.cycle_number, cc.financial_year, cc.due_date,
-                       ce.expected_amount, ce.paid_amount, ce.status, ce.fully_paid_at
+                       ce.expected_amount, ce.paid_amount, ce.status,
+                       ce.first_payment_at, ce.fully_paid_at
                   FROM contribution_entries ce
                   JOIN contribution_cycles cc ON cc.id = ce.cycle_id
                  WHERE ce.member_id = ? AND ce.group_id = ?
@@ -55,8 +60,12 @@ public class MemberStatementJdbcAdapter implements MemberStatementRepository {
                         rs.getObject("due_date", LocalDate.class),
                         rs.getBigDecimal("expected_amount"), rs.getBigDecimal("paid_amount"),
                         rs.getString("status"),
+                        // Use fully_paid_at for PAID, first_payment_at for PARTIAL
                         rs.getTimestamp("fully_paid_at") != null
-                                ? rs.getTimestamp("fully_paid_at").toInstant() : null),
+                                ? rs.getTimestamp("fully_paid_at").toInstant()
+                                : rs.getTimestamp("first_payment_at") != null
+                                ? rs.getTimestamp("first_payment_at").toInstant()
+                                : null),
                 memberId, groupId);
     }
 
