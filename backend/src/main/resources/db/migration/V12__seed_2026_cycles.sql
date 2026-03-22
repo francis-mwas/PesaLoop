@@ -6,27 +6,7 @@
 -- Idempotent: guarded by cycle existence check.
 -- ============================================================
 
-DO $$ BEGIN
-  -- Skip if already applied
-  IF EXISTS (
-    SELECT 1 FROM contribution_cycles
-    WHERE group_id = '22222222-0000-0000-0000-000000000001'
-      AND financial_year = 2026
-  ) THEN
-    RAISE NOTICE 'V12: 2026 cycles already present — skipping';
-    RETURN;
-END IF;
-
-  -- Clean up any old test cycles for this group to avoid duplicate cycle numbers
-DELETE FROM payment_records
-WHERE group_id = '22222222-0000-0000-0000-000000000001';
-DELETE FROM stk_push_requests
-WHERE group_id = '22222222-0000-0000-0000-000000000001';
-DELETE FROM contribution_entries
-WHERE group_id = '22222222-0000-0000-0000-000000000001';
-DELETE FROM contribution_cycles
-WHERE group_id = '22222222-0000-0000-0000-000000000001';
-END $$;
+-- V12 is idempotent via ON CONFLICT DO NOTHING
 
 -- ── Cycles ─────────────────────────────────────────────────────────────────
 INSERT INTO contribution_cycles
@@ -50,7 +30,8 @@ VALUES
      3, 2026, '2026-03-31', '2026-04-03', 'CLOSED',
      645000.00, 600000.00,
      45000.00, 0.00,
-     'KES', NOW(), NOW(), 0);
+     'KES', NOW(), NOW(), 0)
+    ON CONFLICT DO NOTHING;
 
 -- ── Contribution entries (one per member per cycle) ─────────────────────────
 INSERT INTO contribution_entries
