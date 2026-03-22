@@ -5,6 +5,8 @@ import com.pesaloop.contribution.application.port.in.GetCycleSummaryPort;
 import com.pesaloop.contribution.application.port.in.InitiateStkPushPort;
 import com.pesaloop.contribution.application.port.in.RecordContributionPort;
 import com.pesaloop.contribution.application.port.out.ContributionCycleManagementRepository;
+import com.pesaloop.contribution.application.port.out.ContributionEntryRepository;
+import com.pesaloop.contribution.domain.model.ContributionEntry;
 import com.pesaloop.contribution.application.port.out.ContributionCycleManagementRepository.CycleSummaryRow;
 import com.pesaloop.contribution.application.port.out.ContributionCycleManagementRepository.OpenCycleResult;
 import com.pesaloop.shared.adapters.web.ApiResponse;
@@ -38,6 +40,7 @@ public class ContributionController {
     private final InitiateStkPushPort initiateStkPushUseCase;
     private final GetCycleSummaryPort getCycleSummaryUseCase;
     private final ContributionCycleManagementRepository cycleManagement;
+    private final ContributionEntryRepository entryRepository;
 
     @PostMapping("/manual")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER')")
@@ -89,7 +92,7 @@ public class ContributionController {
 
         return ResponseEntity.ok(ApiResponse.success(null,
                 memberName + " set as MGR beneficiary" +
-                (payoutAmount != null ? " — payout KES " + String.format("%,.0f", payoutAmount) : "")));
+                        (payoutAmount != null ? " — payout KES " + String.format("%,.0f", payoutAmount) : "")));
     }
 
     @PostMapping("/cycles/open")
@@ -106,9 +109,41 @@ public class ContributionController {
         OpenCycleResult result = cycleManagement.openCycle(groupId, dueDate, graceDays, mgrBeneficiary);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(result,
                 "Cycle " + result.cycleNumber() + "/" + result.year() + " opened. " +
-                result.memberCount() + " contribution entries created. " +
-                "Total expected: KES " + String.format("%,.0f", result.totalExpected())));
+                        result.memberCount() + " contribution entries created. " +
+                        "Total expected: KES " + String.format("%,.0f", result.totalExpected())));
     }
+
+    // ── Cycle entries — per-member payment status for a cycle ─────────────
+
+    @GetMapping("/cycles/{cycleId}/entries")
+    @PreAuthorize("hasAnyRole('ADMIN','TREASURER','SECRETARY','AUDITOR','MEMBER')")
+    public ResponseEntity<ApiResponse<List<CycleEntryRow>>> getCycleEntries(
+            @PathVariable UUID cycleId) {
+        UUID groupId = TenantContext.getGroupId();
+        List<CycleEntryRow> rows = entryRepository.findByCycleId(cycleId)
+                .stream()
+                .map(e -> new CycleEntryRow(
+                        e.getId(), e.getMemberId(),
+                        e.getExpectedAmount().getAmount(),
+                        e.getPaidAmount().getAmount(),
+                        e.balance().getAmount(),
+                        e.getStatus().name(),
+                        e.getFirstPaymentAt(), e.getFullyPaidAt()
+                ))
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success(rows));
+    }
+
+    public record CycleEntryRow(
+            UUID entryId,
+            UUID memberId,
+            java.math.BigDecimal expectedAmount,
+            java.math.BigDecimal paidAmount,
+            java.math.BigDecimal balance,
+            String status,
+            java.time.Instant firstPaymentAt,
+            java.time.Instant fullyPaidAt
+    ) {}
 
     // ── Typed request bodies (replaces raw Map<String,Object>) ───────────────
     public record SetMgrBeneficiaryRequest(
