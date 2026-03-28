@@ -22,6 +22,10 @@ public interface MemberQueryRepository {
 
     void updateShares(UUID memberId, UUID groupId, int newShares, UUID approvedByUserId, String reason);
 
+    void updateMemberStatus(UUID memberId, UUID groupId, String newStatus, UUID updatedByUserId);
+
+    void deleteMember(UUID memberId, UUID groupId);
+
     record MemberSummary(
             UUID memberId, String memberNumber, String fullName, String phoneNumber,
             String role, String status, int sharesOwned,

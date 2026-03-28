@@ -28,7 +28,7 @@ public class GroupSetupJdbcAdapter implements GroupSetupRepository {
 
     @Override
     public void createFirstMember(UUID groupId, UUID userId,
-                                   String memberNumber, int sharesOwned) {
+                                  String memberNumber, int sharesOwned) {
         jdbc.update(
                 """
                 INSERT INTO members
@@ -106,14 +106,14 @@ public class GroupSetupJdbcAdapter implements GroupSetupRepository {
 
     @Override
     public void createMember(UUID groupId, UUID userId, String memberNumber,
-                              String role, int sharesOwned, String phone) {
+                             String role, int sharesOwned, String phone) {
         jdbc.update(
                 """
                 INSERT INTO members
                     (id, group_id, user_id, member_number, role, status,
                      shares_owned, savings_balance, arrears_balance, fines_balance,
                      phone_number, joined_on, created_by, created_at, updated_at, version)
-                VALUES (gen_random_uuid(),?,?,?,?,?, 'ACTIVE',
+                VALUES (gen_random_uuid(),?,?,?,?,'ACTIVE',
                         ?,0,0,0,?,CURRENT_DATE,?,NOW(),NOW(),0)
                 """,
                 groupId, userId, memberNumber, role, sharesOwned, phone, userId);

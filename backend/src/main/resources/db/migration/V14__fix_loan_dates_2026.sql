@@ -1,0 +1,139 @@
+-- ============================================================
+-- V14__fix_loan_dates_2026.sql
+-- Updates all loan dates from 2024 → 2026 so they reflect
+-- the current year. Adds realistic repayment history.
+-- Loans disbursed Jan–Mar 2026, due 3 months later.
+-- ============================================================
+
+-- ── 1. Update loan disbursement and due dates to 2026 ────────────────────────
+
+-- Loans originally disbursed Jan 2024 → Jan 2026 (3-month terms → due Apr 2026)
+UPDATE loan_accounts
+SET disbursement_date = disbursement_date + INTERVAL '2 years',
+    due_date          = due_date          + INTERVAL '2 years',
+    loan_reference    = REPLACE(loan_reference, 'LN-2024-', 'LN-2026-'),
+    updated_at        = NOW()
+WHERE group_id = '22222222-0000-0000-0000-000000000001';
+
+-- ── 2. Update loan_reference_counters ────────────────────────────────────────
+UPDATE loan_reference_counters
+SET year = 2026
+WHERE group_id = '22222222-0000-0000-0000-000000000001'
+          AND year    = 2024;
+
+-- ── 3. Update existing payment_records timestamps to 2026 ───────────────────
+UPDATE payment_records
+SET recorded_at = recorded_at + INTERVAL '2 years'
+WHERE group_id = '22222222-0000-0000-0000-000000000001'
+  AND payment_type = 'LOAN_REPAYMENT';
+
+-- ── 4. Add realistic repayment history for 2026 loans ────────────────────────
+-- Loans disbursed Jan 2026 have been running for ~3 months.
+-- Some members have made partial repayments in Jan, Feb, Mar.
+
+INSERT INTO payment_records (
+    id, group_id, loan_id, member_id,
+    payment_type, amount, currency_code,
+    payment_method, mpesa_reference, mpesa_transaction_id, status,
+    recorded_by, recorded_at
+) VALUES
+
+-- Alice (LN-2026-0001, 100k): Jan repayment 20,000
+('bbbb2026-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001',
+ 'LOAN_REPAYMENT',20000,'KES','MPESA','QCD5800001','QCD5800001_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-01-28T10:00:00Z'::TIMESTAMPTZ),
+
+-- Alice (LN-2026-0001): Feb repayment 20,000
+('bbbb2026-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001',
+ 'LOAN_REPAYMENT',20000,'KES','MPESA','QCD5800002','QCD5800002_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-02-25T09:30:00Z'::TIMESTAMPTZ),
+
+-- Alice (LN-2026-0001): Mar repayment 20,000
+('bbbb2026-0000-0000-0000-000000000003','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001',
+ 'LOAN_REPAYMENT',20000,'KES','MPESA','QCD5800003','QCD5800003_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-03-20T11:00:00Z'::TIMESTAMPTZ),
+
+-- Beatrice (LN-2026-0002, 100k): Feb repayment 25,000
+('bbbb2026-0000-0000-0000-000000000004','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000002','66666666-0000-0000-0000-000000000003',
+ 'LOAN_REPAYMENT',25000,'KES','MPESA','QCD5800004','QCD5800004_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-02-18T14:00:00Z'::TIMESTAMPTZ),
+
+-- Beatrice (LN-2026-0002): Mar repayment 25,000
+('bbbb2026-0000-0000-0000-000000000005','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000002','66666666-0000-0000-0000-000000000003',
+ 'LOAN_REPAYMENT',25000,'KES','MPESA','QCD5800005','QCD5800005_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-03-15T10:00:00Z'::TIMESTAMPTZ),
+
+-- Hannah (LN-2026-0004, 100k): Mar repayment 30,000
+('bbbb2026-0000-0000-0000-000000000006','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000004','66666666-0000-0000-0000-000000000012',
+ 'LOAN_REPAYMENT',30000,'KES','MPESA','QCD5800006','QCD5800006_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-03-18T09:00:00Z'::TIMESTAMPTZ),
+
+-- Kelvin (LN-2026-0006, 100k): Feb repayment 15,000
+('bbbb2026-0000-0000-0000-000000000007','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000006','66666666-0000-0000-0000-000000000015',
+ 'LOAN_REPAYMENT',15000,'KES','MPESA','QCD5800007','QCD5800007_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-02-22T16:00:00Z'::TIMESTAMPTZ),
+
+-- Kelvin (LN-2026-0006): Mar repayment 15,000
+('bbbb2026-0000-0000-0000-000000000008','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000006','66666666-0000-0000-0000-000000000015',
+ 'LOAN_REPAYMENT',15000,'KES','MPESA','QCD5800008','QCD5800008_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-03-21T08:30:00Z'::TIMESTAMPTZ),
+
+-- Linda (LN-2026-0007, 200k): Feb repayment 40,000
+('bbbb2026-0000-0000-0000-000000000009','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000007','66666666-0000-0000-0000-000000000016',
+ 'LOAN_REPAYMENT',40000,'KES','MPESA','QCD5800009','QCD5800009_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-02-20T13:00:00Z'::TIMESTAMPTZ),
+
+-- Linda (LN-2026-0007): Mar repayment 40,000
+('bbbb2026-0000-0000-0000-000000000010','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000007','66666666-0000-0000-0000-000000000016',
+ 'LOAN_REPAYMENT',40000,'KES','MPESA','QCD5800010','QCD5800010_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-03-19T15:00:00Z'::TIMESTAMPTZ),
+
+-- Peter (LN-2026-0011, 200k): Mar repayment 50,000
+('bbbb2026-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000001',
+ '99999999-0000-0000-0000-000000000011','66666666-0000-0000-0000-000000000022',
+ 'LOAN_REPAYMENT',50000,'KES','MPESA','QCD5800011','QCD5800011_SEED','COMPLETED',
+ '55555555-0000-0000-0000-000000000001','2026-03-10T10:00:00Z'::TIMESTAMPTZ)
+
+    ON CONFLICT DO NOTHING;
+
+-- ── 5. Update principal_balance to reflect repayments made above ─────────────
+
+-- Alice: 100,000 - 60,000 repaid = 40,000 balance
+UPDATE loan_accounts SET
+                         principal_balance = 40000, total_principal_repaid = 60000, updated_at = NOW()
+WHERE id = '99999999-0000-0000-0000-000000000001';
+
+-- Beatrice: 100,000 - 50,000 repaid = 50,000 balance
+UPDATE loan_accounts SET
+                         principal_balance = 50000, total_principal_repaid = 50000, updated_at = NOW()
+WHERE id = '99999999-0000-0000-0000-000000000002';
+
+-- Hannah: 100,000 - 30,000 repaid = 70,000 balance
+UPDATE loan_accounts SET
+                         principal_balance = 70000, total_principal_repaid = 30000, updated_at = NOW()
+WHERE id = '99999999-0000-0000-0000-000000000004';
+
+-- Kelvin: 100,000 - 30,000 repaid = 70,000 balance
+UPDATE loan_accounts SET
+                         principal_balance = 70000, total_principal_repaid = 30000, updated_at = NOW()
+WHERE id = '99999999-0000-0000-0000-000000000006';
+
+-- Linda: 200,000 - 80,000 repaid = 120,000 balance
+UPDATE loan_accounts SET
+                         principal_balance = 120000, total_principal_repaid = 80000, updated_at = NOW()
+WHERE id = '99999999-0000-0000-0000-000000000007';
+
+-- Peter: 200,000 - 50,000 repaid = 150,000 balance
+UPDATE loan_accounts SET
+                         principal_balance = 150000, total_principal_repaid = 50000, updated_at = NOW()
+WHERE id = '99999999-0000-0000-0000-000000000011';

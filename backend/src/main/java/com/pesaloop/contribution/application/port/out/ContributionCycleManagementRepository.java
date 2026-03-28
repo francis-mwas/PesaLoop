@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface ContributionCycleManagementRepository {
 
     List<CycleSummaryRow> findCyclesByGroup(UUID groupId);
+    List<CycleSummaryRow> findCyclesByGroupAndYear(UUID groupId, int year);
 
     void setMgrBeneficiary(UUID cycleId, UUID groupId, UUID memberId, BigDecimal payoutAmount);
 
@@ -28,6 +29,6 @@ public interface ContributionCycleManagementRepository {
     ) {}
 
     record OpenCycleResult(UUID cycleId, int cycleNumber, int year,
-                            LocalDate dueDate, LocalDate gracePeriodEnd,
-                            BigDecimal totalExpected, int memberCount) {}
+                           LocalDate dueDate, LocalDate gracePeriodEnd,
+                           BigDecimal totalExpected, int memberCount) {}
 }

@@ -88,6 +88,24 @@ public class MemberQueryRepositoryAdapter implements MemberQueryRepository {
                 newShares, memberId, groupId);
     }
 
+    @Override
+    public void updateMemberStatus(UUID memberId, UUID groupId, String newStatus, UUID updatedByUserId) {
+        jdbc.update(
+                "UPDATE members SET status=?, updated_at=NOW(), version=version+1 WHERE id=? AND group_id=?",
+                newStatus, memberId, groupId);
+    }
+
+    @Override
+    public void deleteMember(UUID memberId, UUID groupId) {
+        // Soft-delete — set status to DELETED and anonymize PII
+        jdbc.update(
+                """
+                UPDATE members SET status='DELETED', updated_at=NOW(), version=version+1
+                 WHERE id=? AND group_id=?
+                """,
+                memberId, groupId);
+    }
+
     private MemberSummary mapRow(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
         return new MemberSummary(
                 UUID.fromString(rs.getString("id")),

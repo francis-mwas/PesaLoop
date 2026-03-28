@@ -79,14 +79,18 @@ public class ApplyForLoanUseCase implements ApplyForLoanPort {
                     "This group type does not support loans. Only TABLE_BANKING groups can issue loans.");
         }
 
-        Member member = memberRepository.findByGroupIdAndUserId(groupId, applicantUserId)
+        Member member = (request.targetMemberId() != null)
+                ? memberRepository.findById(request.targetMemberId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Target member not found: " + request.targetMemberId()))
+                : memberRepository.findByGroupIdAndUserId(groupId, applicantUserId)
                 .orElseThrow(() -> new IllegalStateException(
                         "You are not an active member of this group"));
 
         if (!member.isActive()) {
             throw new IllegalStateException(
                     "Your membership is " + member.getStatus().name().toLowerCase()
-                    + ". Only active members can apply for loans.");
+                            + ". Only active members can apply for loans.");
         }
 
         // ── 2. Run eligibility checks ─────────────────────────────────────────
@@ -155,9 +159,9 @@ public class ApplyForLoanUseCase implements ApplyForLoanPort {
                         LoanStatus.REJECTED,
                         false,
                         "This loan would give you %.1f%% of the group's total loan book (max allowed: %.1f%%). "
-                        .formatted(projectedShare.multiply(BigDecimal.valueOf(100)).doubleValue(),
-                                MAX_SINGLE_BORROWER_SHARE.multiply(BigDecimal.valueOf(100)).doubleValue())
-                        + "Apply for a smaller amount or wait until other loans are repaid.",
+                                .formatted(projectedShare.multiply(BigDecimal.valueOf(100)).doubleValue(),
+                                        MAX_SINGLE_BORROWER_SHARE.multiply(BigDecimal.valueOf(100)).doubleValue())
+                                + "Apply for a smaller amount or wait until other loans are repaid.",
                         List.of(), null
                 );
             }

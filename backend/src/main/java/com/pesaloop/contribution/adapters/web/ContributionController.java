@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -71,9 +72,13 @@ public class ContributionController {
 
     @GetMapping("/cycles")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR')")
-    public ResponseEntity<ApiResponse<List<CycleSummaryRow>>> listCycles() {
+    public ResponseEntity<ApiResponse<List<CycleSummaryRow>>> listCycles(
+            @RequestParam(required = false) Integer year) {
         UUID groupId = TenantContext.getGroupId();
-        return ResponseEntity.ok(ApiResponse.success(cycleManagement.findCyclesByGroup(groupId)));
+        List<CycleSummaryRow> cycles = year != null
+                ? cycleManagement.findCyclesByGroupAndYear(groupId, year)
+                : cycleManagement.findCyclesByGroup(groupId);
+        return ResponseEntity.ok(ApiResponse.success(cycles));
     }
 
     @PutMapping("/cycles/{cycleId}/mgr-beneficiary")

@@ -52,6 +52,39 @@ public class ContributionCycleManagementAdapter implements ContributionCycleMana
     }
 
     @Override
+    public List<CycleSummaryRow> findCyclesByGroupAndYear(UUID groupId, int year) {
+        return jdbc.query(
+                """
+                SELECT cc.id, cc.cycle_number, cc.financial_year, cc.due_date, cc.grace_period_end,
+                       cc.status, cc.total_expected_amount,
+                       COALESCE(SUM(ce.paid_amount), cc.total_collected_amount) AS total_collected_amount,
+                       cc.mgr_beneficiary_id, cc.mgr_payout_amount, cc.mgr_paid_out_at
+                  FROM contribution_cycles cc
+                  LEFT JOIN contribution_entries ce ON ce.cycle_id = cc.id
+                 WHERE cc.group_id = ? AND cc.financial_year = ?
+                 GROUP BY cc.id, cc.cycle_number, cc.financial_year, cc.due_date,
+                          cc.grace_period_end, cc.status, cc.total_expected_amount,
+                          cc.mgr_beneficiary_id, cc.mgr_payout_amount, cc.mgr_paid_out_at
+                 ORDER BY cc.cycle_number ASC
+                """,
+                (rs, row) -> new CycleSummaryRow(
+                        UUID.fromString(rs.getString("id")),
+                        rs.getInt("cycle_number"),
+                        rs.getInt("financial_year"),
+                        rs.getObject("due_date", LocalDate.class),
+                        rs.getObject("grace_period_end", LocalDate.class),
+                        rs.getString("status"),
+                        rs.getBigDecimal("total_expected_amount"),
+                        rs.getBigDecimal("total_collected_amount"),
+                        rs.getString("mgr_beneficiary_id") != null
+                                ? UUID.fromString(rs.getString("mgr_beneficiary_id")) : null,
+                        rs.getBigDecimal("mgr_payout_amount"),
+                        rs.getTimestamp("mgr_paid_out_at") != null
+                                ? rs.getTimestamp("mgr_paid_out_at").toInstant() : null),
+                groupId, year);
+    }
+
+    @Override
     public void setMgrBeneficiary(UUID cycleId, UUID groupId,
                                   UUID memberId, BigDecimal payoutAmount) {
         int updated = jdbc.update(

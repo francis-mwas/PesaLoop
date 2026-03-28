@@ -36,7 +36,7 @@ public class LoanController {
     // ── Apply ─────────────────────────────────────────────────────────────────
 
     @Operation(summary = "Submit a loan application",
-               description = "Member applies for a loan. Eligibility is checked immediately against the product rules.")
+            description = "Member applies for a loan. Eligibility is checked immediately against the product rules.")
     @PostMapping("/applications")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER','MEMBER')")
     @ResponseStatus(HttpStatus.CREATED)
@@ -58,7 +58,7 @@ public class LoanController {
     // ── Pending applications ──────────────────────────────────────────────────
 
     @Operation(summary = "List pending loan applications",
-               description = "Returns loans in PENDING_GUARANTOR or PENDING_APPROVAL status awaiting admin action.")
+            description = "Returns loans in PENDING_GUARANTOR or PENDING_APPROVAL status awaiting admin action.")
     @GetMapping("/applications/pending")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER')")
     public ResponseEntity<ApiResponse<List<LoanSummaryRow>>> getPendingApplications() {
@@ -71,7 +71,7 @@ public class LoanController {
     // ── Approve / reject ──────────────────────────────────────────────────────
 
     @Operation(summary = "Approve or reject a loan application",
-               description = "Admin approves (optionally with a reduced amount) or rejects a pending application.")
+            description = "Admin approves (optionally with a reduced amount) or rejects a pending application.")
     @PutMapping("/applications/{loanId}/process")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER')")
     public ResponseEntity<ApiResponse<LoanDetailResponse>> processApplication(
@@ -121,7 +121,7 @@ public class LoanController {
     // ── Record repayment ──────────────────────────────────────────────────────
 
     @Operation(summary = "Record a manual loan repayment",
-               description = "Records cash or bank transfer. M-Pesa STK Push repayments arrive via the webhook.")
+            description = "Records cash or bank transfer. M-Pesa STK Push repayments arrive via the webhook.")
     @PostMapping("/{loanId}/repayments")
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER','MEMBER')")
     public ResponseEntity<ApiResponse<RepaymentResponse>> recordRepayment(
@@ -140,6 +140,18 @@ public class LoanController {
                         : "Repayment recorded. Outstanding: KES " + response.remainingOutstanding()));
     }
 
+    // ── Get repayment history for a loan ─────────────────────────────────────
+
+    @Operation(summary = "Get repayment history for a loan")
+    @GetMapping("/{loanId}/repayments")
+    @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR','MEMBER')")
+    public ResponseEntity<ApiResponse<List<LoanAccountRepository.PaymentRow>>> getRepayments(
+            @PathVariable UUID loanId) {
+        UUID groupId = TenantContext.getGroupId();
+        List<LoanAccountRepository.PaymentRow> rows = loanRepository.findRepaymentHistory(loanId, groupId);
+        return ResponseEntity.ok(ApiResponse.success(rows));
+    }
+
     // ── Get single loan ───────────────────────────────────────────────────────
 
     @Operation(summary = "Get full loan details with repayment schedule")
@@ -155,7 +167,7 @@ public class LoanController {
     // ── Loan book ─────────────────────────────────────────────────────────────
 
     @Operation(summary = "Group loan book",
-               description = "Lists all loans for the group. Filter by ?status=ACTIVE|DEFAULTED|PENDING_APPROVAL etc.")
+            description = "Lists all loans for the group. Filter by ?status=ACTIVE|DEFAULTED|PENDING_APPROVAL etc.")
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR')")
     public ResponseEntity<ApiResponse<List<LoanSummaryRow>>> getLoanBook(

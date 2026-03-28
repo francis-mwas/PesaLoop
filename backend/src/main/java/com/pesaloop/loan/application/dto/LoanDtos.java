@@ -29,6 +29,11 @@ public final class LoanDtos {
             /** Phone to disburse to. Defaults to member's registered phone. */
             String disbursementPhone,
             /**
+             * Optional: admin/treasurer can apply on behalf of a specific member.
+             * If null, the loan is applied for the authenticated user themselves.
+             */
+            UUID targetMemberId,
+            /**
              * Optional: member nominates their own guarantors at application time.
              * If product.requiresGuarantor=true and this list is non-empty,
              * guarantors are created immediately and notified by SMS.

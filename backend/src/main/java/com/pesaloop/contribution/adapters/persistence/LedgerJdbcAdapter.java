@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,8 +19,8 @@ public class LedgerJdbcAdapter implements LedgerRepository {
 
     @Override
     public List<MemberLedgerRow> findMonthlyLedger(UUID groupId,
-                                                    LocalDate monthStart,
-                                                    LocalDate monthEnd) {
+                                                   LocalDate monthStart,
+                                                   LocalDate monthEnd) {
         return jdbc.query(
                 """
                 SELECT
@@ -98,8 +99,8 @@ public class LedgerJdbcAdapter implements LedgerRepository {
                 ),
                 monthStart, monthEnd,
                 monthStart,
-                monthStart.atStartOfDay().toString(),
-                monthEnd.plusDays(1).atStartOfDay().toString(),
+                Timestamp.valueOf(monthStart.atStartOfDay()),
+                Timestamp.valueOf(monthEnd.plusDays(1).atStartOfDay()),
                 groupId
         );
     }

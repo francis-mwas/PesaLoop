@@ -293,4 +293,26 @@ public class LoanAccountJdbcAdapter implements LoanAccountRepository {
                 rs.getString("disbursement_mpesa_ref")
         );
     }
+
+    @Override
+    public List<PaymentRow> findRepaymentHistory(UUID loanId, UUID groupId) {
+        return jdbc.query(
+                """
+                SELECT pr.amount, pr.payment_method, pr.mpesa_reference,
+                       pr.narration, pr.recorded_at
+                  FROM payment_records pr
+                 WHERE pr.loan_id  = ?
+                   AND pr.group_id = ?
+                   AND pr.payment_type = 'LOAN_REPAYMENT'
+                   AND pr.status = 'COMPLETED'
+                 ORDER BY pr.recorded_at ASC
+                """,
+                (rs, row) -> new PaymentRow(
+                        rs.getBigDecimal("amount"),
+                        rs.getString("payment_method"),
+                        rs.getString("mpesa_reference"),
+                        rs.getString("narration"),
+                        rs.getTimestamp("recorded_at").toInstant()),
+                loanId, groupId);
+    }
 }

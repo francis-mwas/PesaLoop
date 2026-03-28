@@ -128,6 +128,45 @@ public class MemberController {
         return ResponseEntity.ok(ApiResponse.success(null, "Shares updated to " + req.shares()));
     }
 
+    /**
+     * PATCH /api/v1/groups/{groupId}/members/{memberId}/status
+     * Admin activates, suspends or deactivates a member.
+     * Allowed values: ACTIVE, SUSPENDED, INACTIVE
+     */
+    @PatchMapping("/{memberId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> updateStatus(
+            @PathVariable UUID groupId,
+            @PathVariable UUID memberId,
+            @RequestBody UpdateStatusRequest req,
+            @AuthenticationPrincipal String userId) {
+
+        java.util.Set<String> allowed = java.util.Set.of("ACTIVE", "SUSPENDED", "INACTIVE");
+        if (!allowed.contains(req.status().toUpperCase())) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Status must be one of: ACTIVE, SUSPENDED, INACTIVE", "INVALID_STATUS"));
+        }
+        memberQueryRepository.updateMemberStatus(memberId, groupId,
+                req.status().toUpperCase(), UUID.fromString(userId));
+        return ResponseEntity.ok(ApiResponse.success(null, "Member status updated to " + req.status()));
+    }
+
+    /**
+     * DELETE /api/v1/groups/{groupId}/members/{memberId}
+     * Admin soft-deletes a member (sets status=DELETED).
+     * Members with active loans cannot be deleted.
+     */
+    @DeleteMapping("/{memberId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteMember(
+            @PathVariable UUID groupId,
+            @PathVariable UUID memberId,
+            @AuthenticationPrincipal String userId) {
+
+        memberQueryRepository.deleteMember(memberId, groupId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Member removed from group"));
+    }
+
     // ── Request bodies ────────────────────────────────────────────────────────
 
     public record AddMemberBody(
@@ -140,4 +179,6 @@ public class MemberController {
     ) {}
 
     public record UpdateSharesRequest(@Min(1) int shares, String reason) {}
+
+    public record UpdateStatusRequest(@NotNull String status) {}
 }

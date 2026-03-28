@@ -107,4 +107,12 @@ public interface LoanAccountRepository {
             BigDecimal principalAmount, BigDecimal totalOutstanding,
             LocalDate dueDate, boolean overdue
     ) {}
+
+    List<PaymentRow> findRepaymentHistory(UUID loanId, UUID groupId);
+
+    record PaymentRow(
+            BigDecimal amount, String paymentMethod,
+            String mpesaReference, String narration,
+            java.time.Instant recordedAt
+    ) {}
 }
