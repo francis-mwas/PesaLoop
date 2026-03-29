@@ -145,7 +145,7 @@ public class ContributionCycleManagementAdapter implements ContributionCycleMana
                      currency_code, status, created_by, created_at, updated_at, version)
                 SELECT gen_random_uuid(), m.group_id, ?, m.id,
                        m.shares_owned * g.share_price_amount, 0,
-                       'KES', 'PENDING', m.id, NOW(), NOW(), 0
+                       'KES', 'PENDING', m.user_id, NOW(), NOW(), 0
                   FROM members m JOIN groups g ON g.id=m.group_id
                  WHERE m.group_id=? AND m.status='ACTIVE'
                 """,

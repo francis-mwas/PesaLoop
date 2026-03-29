@@ -56,8 +56,8 @@ public class ContributionCycleSchedulerAdapter implements ContributionCycleSched
     @Override
     @Transactional
     public UUID createCycleWithEntries(UUID groupId, int cycleNumber, int financialYear,
-                                        LocalDate dueDate, LocalDate gracePeriodEnd,
-                                        String currencyCode) {
+                                       LocalDate dueDate, LocalDate gracePeriodEnd,
+                                       String currencyCode) {
         // Calculate total expected (snapshot at cycle creation)
         BigDecimal totalExpected = jdbc.queryForObject(
                 """
@@ -96,7 +96,7 @@ public class ContributionCycleSchedulerAdapter implements ContributionCycleSched
                             THEN m.custom_contribution_amount
                             ELSE g.share_price_amount * m.shares_owned
                        END,
-                       0, g.currency_code, 'PENDING', m.id, NOW(), NOW(), 0
+                       0, g.currency_code, 'PENDING', m.user_id, NOW(), NOW(), 0
                   FROM members m
                   JOIN groups g ON g.id = m.group_id
                  WHERE m.group_id = ? AND m.status = 'ACTIVE'

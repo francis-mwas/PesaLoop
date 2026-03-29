@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
@@ -18,15 +19,20 @@ import java.util.UUID;
  * - Created/updated audit timestamps
  * - Created/updated by (user UUID)
  * - group_id for multi-tenancy (overridable)
+ *
+ * Implements Persistable<UUID> so Spring Data asks us whether the entity
+ * is new rather than guessing from the id/version fields. This is required
+ * because domain models generate their own UUIDs before persistence, which
+ * would otherwise cause Spring Data to call merge() instead of persist()
+ * on brand-new entities (leading to StaleObjectStateException).
  */
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
-public abstract class BaseEntity {
+public abstract class BaseEntity implements Persistable<UUID> {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
 
@@ -50,6 +56,17 @@ public abstract class BaseEntity {
     private UUID updatedBy;
 
     @Version
-    @Column(name = "version")          // nullable — null means brand-new entity (PERSIST not MERGE)
+    @Column(name = "version")
     private Long version;
+
+    /**
+     * An entity is new if it has never been persisted — i.e. version is null.
+     * After the first persist(), Hibernate sets version=0, so isNew()=false
+     * on all subsequent saves (which correctly use merge/UPDATE).
+     */
+    @Override
+    @Transient
+    public boolean isNew() {
+        return version == null;
+    }
 }

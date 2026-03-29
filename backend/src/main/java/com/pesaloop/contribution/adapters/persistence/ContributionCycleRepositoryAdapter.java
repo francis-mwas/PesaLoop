@@ -20,6 +20,18 @@ public class ContributionCycleRepositoryAdapter implements ContributionCycleRepo
 
     @Override
     public ContributionCycle save(ContributionCycle cycle) {
+        if (cycle.getId() != null) {
+            return jpa.findById(cycle.getId()).map(existing -> {
+                existing.setTotalCollectedAmount(cycle.getTotalCollected().getAmount());
+                existing.setStatus(cycle.getStatus());
+                existing.setMgrBeneficiaryId(cycle.getMgrBeneficiaryMemberId());
+                return mapper.toDomain(jpa.save(existing));
+            }).orElseGet(() -> {
+                ContributionCycleJpaEntity entity = mapper.toEntity(cycle);
+                entity.setGroupId(cycle.getGroupId());
+                return mapper.toDomain(jpa.save(entity));
+            });
+        }
         ContributionCycleJpaEntity entity = mapper.toEntity(cycle);
         entity.setGroupId(cycle.getGroupId());
         return mapper.toDomain(jpa.save(entity));
@@ -33,8 +45,8 @@ public class ContributionCycleRepositoryAdapter implements ContributionCycleRepo
     @Override
     public Optional<ContributionCycle> findCurrentOpenCycle(UUID groupId) {
         return jpa.findOpenCycles(groupId,
-                ContributionCycle.CycleStatus.OPEN,
-                ContributionCycle.CycleStatus.GRACE_PERIOD)
+                        ContributionCycle.CycleStatus.OPEN,
+                        ContributionCycle.CycleStatus.GRACE_PERIOD)
                 .stream().findFirst().map(mapper::toDomain);
     }
 

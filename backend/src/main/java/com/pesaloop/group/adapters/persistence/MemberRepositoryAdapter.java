@@ -25,6 +25,18 @@ public class MemberRepositoryAdapter implements MemberRepository {
 
     @Override
     public Member save(Member member) {
+        if (member.getId() != null) {
+            return jpa.findById(member.getId()).map(existing -> {
+                existing.setSavingsBalance(member.getSavingsBalance().getAmount());
+                existing.setArrearsBalance(member.getArrearsBalance() != null
+                        ? member.getArrearsBalance().getAmount()
+                        : java.math.BigDecimal.ZERO);
+                existing.setSharesOwned(member.getSharesOwned());
+                existing.setStatus(member.getStatus());
+                existing.setRole(member.getRole());
+                return toDomain(jpa.save(existing));
+            }).orElseGet(() -> toDomain(jpa.save(toEntity(member))));
+        }
         return toDomain(jpa.save(toEntity(member)));
     }
 

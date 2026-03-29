@@ -8,6 +8,12 @@ import java.util.UUID;
 
 public interface ContributionEntryRepository {
     ContributionEntry save(ContributionEntry entry);
+
+    /**
+     * Returns true if the reference already exists in payment_records for this group
+     * with a matching payment method channel. False for CASH and blank references.
+     */
+    boolean isDuplicateReference(UUID groupId, String reference, String paymentMethod);
     Optional<ContributionEntry> findById(UUID id);
     Optional<ContributionEntry> findByCycleIdAndMemberId(UUID cycleId, UUID memberId);
     List<ContributionEntry> findByCycleId(UUID cycleId);

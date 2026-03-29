@@ -59,7 +59,7 @@ public class ManualPaymentJdbcAdapter implements ManualPaymentRepository {
     @Override
     @Transactional
     public void applyContributionPayment(UUID cycleId, UUID memberId, BigDecimal amount,
-                                          String methodName, String reference, UUID recordedBy) {
+                                         String methodName, String reference, UUID recordedBy) {
         jdbc.update(
                 """
                 UPDATE contribution_entries
@@ -92,7 +92,7 @@ public class ManualPaymentJdbcAdapter implements ManualPaymentRepository {
     @Override
     @Transactional
     public void applyLoanRepayment(UUID loanId, BigDecimal toPrincipal, BigDecimal toInterest,
-                                    BigDecimal toPenalty, boolean fullySettled) {
+                                   BigDecimal toPenalty, boolean fullySettled) {
         jdbc.update(
                 """
                 UPDATE loan_accounts
@@ -114,7 +114,7 @@ public class ManualPaymentJdbcAdapter implements ManualPaymentRepository {
     @Override
     @Transactional
     public void applyRepaymentToInstallment(UUID loanId, BigDecimal toPrincipal,
-                                             BigDecimal toInterest, BigDecimal toPenalty) {
+                                            BigDecimal toInterest, BigDecimal toPenalty) {
         jdbc.update(
                 """
                 UPDATE repayment_installments
@@ -136,11 +136,34 @@ public class ManualPaymentJdbcAdapter implements ManualPaymentRepository {
         jdbc.update("UPDATE loan_guarantors SET status='RELEASED' WHERE loan_id=?", loanId);
     }
 
+    // Payment method channels that carry a meaningful, unique reference number
+    private static final java.util.Set<String> REFERENCE_CHANNELS = java.util.Set.of(
+            "MPESA_PAYBILL", "MPESA_TILL", "MPESA_STK_PUSH", "BANK_TRANSFER"
+    );
+
+    @Override
+    public boolean isDuplicateReference(UUID groupId, String reference, String paymentMethod) {
+        // Cash / internal transfers have no meaningful reference to deduplicate
+        if (reference == null || reference.isBlank()) return false;
+        if (!REFERENCE_CHANNELS.contains(paymentMethod)) return false;
+
+        Integer count = jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM payment_records
+                 WHERE group_id       = ?
+                   AND mpesa_reference = ?
+                   AND payment_method  = ?
+                   AND status         != 'REVERSED'
+                """,
+                Integer.class, groupId, reference, paymentMethod);
+        return count != null && count > 0;
+    }
+
     @Override
     @Transactional
     public UUID recordPayment(UUID groupId, UUID memberId, UUID cycleId, UUID loanId,
-                               String paymentType, BigDecimal amount, String methodName,
-                               String reference, String notes, UUID recordedBy) {
+                              String paymentType, BigDecimal amount, String methodName,
+                              String reference, String notes, UUID recordedBy) {
         UUID id = UUID.randomUUID();
         jdbc.update(
                 """

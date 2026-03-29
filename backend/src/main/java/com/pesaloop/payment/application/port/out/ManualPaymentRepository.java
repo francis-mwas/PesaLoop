@@ -20,26 +20,34 @@ public interface ManualPaymentRepository {
 
     /** Applies a contribution payment to the entry, cycle totals, and member balance. */
     void applyContributionPayment(UUID cycleId, UUID memberId, BigDecimal amount,
-                                   String methodName, String reference, UUID recordedBy);
+                                  String methodName, String reference, UUID recordedBy);
 
     /** Validates loan is active. Returns loan info. */
     LoanInfo findActiveLoan(UUID loanId, UUID memberId, UUID groupId);
 
     /** Applies loan repayment — penalty, interest, principal in order. */
     void applyLoanRepayment(UUID loanId, BigDecimal toPrincipal, BigDecimal toInterest,
-                             BigDecimal toPenalty, boolean fullySettled);
+                            BigDecimal toPenalty, boolean fullySettled);
 
     /** Updates the next due installment. */
     void applyRepaymentToInstallment(UUID loanId, BigDecimal toPrincipal,
-                                      BigDecimal toInterest, BigDecimal toPenalty);
+                                     BigDecimal toInterest, BigDecimal toPenalty);
 
     /** Releases guarantors on settlement. */
     void releaseGuarantors(UUID loanId);
 
+    /**
+     * Returns true if the given reference already exists as a COMPLETED payment
+     * for this group with the same payment method channel (M-Pesa/Bank).
+     * Used to prevent duplicate submission of the same transaction reference.
+     * Always returns false for CASH and INTERNAL_TRANSFER (no meaningful reference).
+     */
+    boolean isDuplicateReference(UUID groupId, String reference, String paymentMethod);
+
     /** Records the payment_records row and audit_log entry. */
     UUID recordPayment(UUID groupId, UUID memberId, UUID cycleId, UUID loanId,
-                        String paymentType, BigDecimal amount, String methodName,
-                        String reference, String notes, UUID recordedBy);
+                       String paymentType, BigDecimal amount, String methodName,
+                       String reference, String notes, UUID recordedBy);
 
     record MemberInfo(UUID id, String memberNumber, String status, String fullName) {}
     record LoanInfo(UUID id, String loanRef, String status,

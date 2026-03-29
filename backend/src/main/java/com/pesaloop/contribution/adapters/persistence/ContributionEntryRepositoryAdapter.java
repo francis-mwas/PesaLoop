@@ -22,6 +22,31 @@ public class ContributionEntryRepositoryAdapter implements ContributionEntryRepo
 
     @Override
     public ContributionEntry save(ContributionEntry entry) {
+        if (entry.getId() != null) {
+            // For existing entities: load the JPA instance already in the session,
+            // update its fields in-place, then save. This prevents the
+            // "different object with same identifier" Hibernate conflict that occurs
+            // when mapper.toEntity() creates a second Java object for the same DB row.
+            return jpa.findById(entry.getId()).map(existing -> {
+                existing.setPaidAmount(entry.getPaidAmount().getAmount());
+                existing.setStatus(entry.getStatus());
+                existing.setLastPaymentMethod(entry.getLastPaymentMethod());
+                existing.setLastMpesaReference(entry.getLastMpesaReference());
+                existing.setRecordedBy(entry.getRecordedBy());
+                existing.setFirstPaymentAt(entry.getFirstPaymentAt());
+                existing.setFullyPaidAt(entry.getFullyPaidAt());
+                existing.setArrearsCarriedForward(
+                        entry.getArrearsCarriedForward() != null
+                                ? entry.getArrearsCarriedForward().getAmount() : null);
+                return mapper.toDomain(jpa.save(existing));
+            }).orElseGet(() -> {
+                // Entity not yet in session — safe to create fresh
+                ContributionEntryJpaEntity entity = mapper.toEntity(entry);
+                entity.setGroupId(entry.getGroupId());
+                return mapper.toDomain(jpa.save(entity));
+            });
+        }
+        // Brand new entry — no id yet
         ContributionEntryJpaEntity entity = mapper.toEntity(entry);
         entity.setGroupId(entry.getGroupId());
         return mapper.toDomain(jpa.save(entity));
@@ -59,6 +84,24 @@ public class ContributionEntryRepositoryAdapter implements ContributionEntryRepo
     public List<ContributionEntry> findUnpaidByCycleId(UUID cycleId) {
         return jpa.findUnpaidByCycleId(cycleId)
                 .stream().map(mapper::toDomain).collect(Collectors.toList());
+    }
+
+    private static final java.util.Set<String> REFERENCE_CHANNELS = java.util.Set.of(
+            "MPESA_PAYBILL", "MPESA_TILL", "MPESA_STK_PUSH", "BANK_TRANSFER"
+    );
+
+    @Override
+    public boolean isDuplicateReference(UUID groupId, String reference, String paymentMethod) {
+        if (reference == null || reference.isBlank()) return false;
+        if (!REFERENCE_CHANNELS.contains(paymentMethod)) return false;
+        Integer count = jdbc.queryForObject(
+                """                SELECT COUNT(*) FROM payment_records
+                 WHERE group_id        = ?
+                   AND mpesa_reference  = ?
+                   AND payment_method   = ?
+                   AND status          != 'REVERSED'                """,
+                Integer.class, groupId, reference, paymentMethod);
+        return count != null && count > 0;
     }
 
     @Override

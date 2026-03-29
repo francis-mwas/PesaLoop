@@ -68,6 +68,18 @@ public class RecordContributionUseCase implements RecordContributionPort {
                             .formatted(member.getStatus().name().toLowerCase()));
         }
 
+        // ── 2b. Validate payment reference uniqueness ────────────────────────────
+        if (request.reference() != null && !request.reference().isBlank()) {
+            String methodName = request.paymentMethod() != null
+                    ? request.paymentMethod().name() : "";
+            if (entryRepository.isDuplicateReference(groupId, request.reference(), methodName)) {
+                throw new IllegalArgumentException(
+                        "Reference '" + request.reference() + "' has already been used for a "
+                                + methodName + " payment in this group. "
+                                + "Each M-Pesa or bank transaction reference must be unique.");
+            }
+        }
+
         // ── 3. Load the contribution entry ────────────────────────────────────
         ContributionEntry entry = entryRepository
                 .findByCycleIdAndMemberId(request.cycleId(), request.memberId())

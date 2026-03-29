@@ -63,11 +63,21 @@ public class RecordManualPaymentUseCase implements RecordManualPaymentPort {
         // ── 2. Validate method is MANUAL ──────────────────────────────────────
         if (!req.method().name().startsWith("MANUAL_"))
             throw new IllegalArgumentException(
-                "Method must be a MANUAL_ type. Got: " + req.method() +
-                ". For M-Pesa use the STK Push or Paybill endpoints.");
+                    "Method must be a MANUAL_ type. Got: " + req.method() +
+                            ". For M-Pesa use the STK Push or Paybill endpoints.");
 
         String internalRef = (req.reference() != null && !req.reference().isBlank())
                 ? req.reference() : "MAN-" + System.currentTimeMillis();
+
+        // ── 2b. Validate reference uniqueness for M-Pesa / Bank payments ─────
+        if (req.reference() != null && !req.reference().isBlank()) {
+            if (paymentRepository.isDuplicateReference(groupId, req.reference(), req.method().name())) {
+                throw new IllegalArgumentException(
+                        "Reference '" + req.reference() + "' has already been recorded for a "
+                                + req.method().name() + " payment in this group. "
+                                + "Each M-Pesa or bank transaction reference must be unique.");
+            }
+        }
 
         // ── 3. Apply payment to target ────────────────────────────────────────
         String targetRef;
@@ -79,7 +89,7 @@ public class RecordManualPaymentUseCase implements RecordManualPaymentPort {
                 resolvedCycleId = paymentRepository.findCurrentOpenCycleId(groupId, req.memberId());
                 if (resolvedCycleId == null)
                     throw new IllegalStateException(
-                        "No open contribution cycle found for this member. Specify a cycleId.");
+                            "No open contribution cycle found for this member. Specify a cycleId.");
             }
             int cycleNumber = paymentRepository.validateAndGetCycleNumber(resolvedCycleId, groupId);
             paymentRepository.applyContributionPayment(resolvedCycleId, req.memberId(),
@@ -100,8 +110,8 @@ public class RecordManualPaymentUseCase implements RecordManualPaymentPort {
                     .add(loan.accruedInterest()).add(loan.penaltyBalance());
             if (req.amount().compareTo(totalOutstanding) > 0)
                 throw new IllegalArgumentException(
-                    "Payment of %s exceeds outstanding balance of %s for loan %s"
-                        .formatted(req.amount(), totalOutstanding, loan.loanRef()));
+                        "Payment of %s exceeds outstanding balance of %s for loan %s"
+                                .formatted(req.amount(), totalOutstanding, loan.loanRef()));
 
             // Allocate: penalty → interest → principal
             BigDecimal remaining  = req.amount();
