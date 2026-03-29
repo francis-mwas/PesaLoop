@@ -95,11 +95,13 @@ public class ContributionEntryRepositoryAdapter implements ContributionEntryRepo
         if (reference == null || reference.isBlank()) return false;
         if (!REFERENCE_CHANNELS.contains(paymentMethod)) return false;
         Integer count = jdbc.queryForObject(
-                """                SELECT COUNT(*) FROM payment_records
-                 WHERE group_id        = ?
-                   AND mpesa_reference  = ?
-                   AND payment_method   = ?
-                   AND status          != 'REVERSED'                """,
+                """  
+                      SELECT COUNT(*) FROM payment_records
+                         WHERE group_id        = ?
+                           AND mpesa_reference  = ?
+                           AND payment_method   = ?
+                           AND status          != 'REVERSED'              
+                   """,
                 Integer.class, groupId, reference, paymentMethod);
         return count != null && count > 0;
     }
