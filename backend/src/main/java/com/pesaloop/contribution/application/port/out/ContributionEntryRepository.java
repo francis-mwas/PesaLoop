@@ -18,4 +18,13 @@ public interface ContributionEntryRepository {
 
     /** Members who have not fully paid in a cycle — for reminders */
     List<ContributionEntry> findUnpaidByCycleId(UUID cycleId);
+
+    /** Individual payment records for a specific member's entry in a cycle */
+    List<EntryPayment> findPaymentsByEntryMember(UUID cycleId, UUID memberId, UUID groupId);
+
+    record EntryPayment(
+            java.math.BigDecimal amount, String paymentMethod,
+            String mpesaReference, String narration,
+            java.time.Instant recordedAt
+    ) {}
 }

@@ -132,7 +132,7 @@ class ApplyForLoanUseCaseTest {
             when(loanRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             var request = new ApplyForLoanRequest(productId, new BigDecimal("150000"),
-                    3, null, null, null);
+                    3, null, null, null, null);
             var result = useCase.execute(request, userId);
 
             assertThat(result.eligible()).isTrue();
@@ -152,7 +152,7 @@ class ApplyForLoanUseCaseTest {
             when(loanRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             var request = new ApplyForLoanRequest(productId, new BigDecimal("270000"),
-                    3, null, null, null);
+                    3, null, null, null, null);
             var result = useCase.execute(request, userId);
 
             assertThat(result.eligible()).isTrue();
@@ -184,7 +184,7 @@ class ApplyForLoanUseCaseTest {
 
             var result = useCase.execute(
                     new ApplyForLoanRequest(productId, new BigDecimal("50000"),
-                            null, null, null, null),
+                            null, null, null, null, null),
                     userId);
 
             assertThat(result.eligible()).isFalse();
@@ -214,7 +214,7 @@ class ApplyForLoanUseCaseTest {
 
             var result = useCase.execute(
                     new ApplyForLoanRequest(productId, new BigDecimal("50000"),
-                            null, null, null, null),
+                            null, null, null, null, null),
                     userId);
 
             assertThat(result.eligible()).isFalse();
@@ -233,7 +233,7 @@ class ApplyForLoanUseCaseTest {
 
             var result = useCase.execute(
                     new ApplyForLoanRequest(productId, new BigDecimal("350000"),
-                            null, null, null, null),
+                            null, null, null, null, null),
                     userId);
 
             assertThat(result.eligible()).isFalse();
@@ -252,7 +252,7 @@ class ApplyForLoanUseCaseTest {
 
             var result = useCase.execute(
                     new ApplyForLoanRequest(productId, new BigDecimal("50000"),
-                            null, null, null, null),
+                            null, null, null, null, null),
                     userId);
 
             assertThat(result.eligible()).isFalse();
@@ -288,7 +288,7 @@ class ApplyForLoanUseCaseTest {
 
             var result = useCase.execute(
                     new ApplyForLoanRequest(productId, new BigDecimal("200000"),
-                            null, null, null, null),
+                            null, null, null, null, null),
                     userId);
 
             assertThat(result.eligible()).isFalse();
@@ -316,7 +316,7 @@ class ApplyForLoanUseCaseTest {
 
             assertThatThrownBy(() -> useCase.execute(
                     new ApplyForLoanRequest(productId, new BigDecimal("50000"),
-                            null, null, null, null),
+                            null, null, null, null, null),
                     userId))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("TABLE_BANKING");

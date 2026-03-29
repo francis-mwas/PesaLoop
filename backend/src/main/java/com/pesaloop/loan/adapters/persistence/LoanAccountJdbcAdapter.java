@@ -198,7 +198,7 @@ public class LoanAccountJdbcAdapter implements LoanAccountRepository {
 
         return jdbc.query(
                 """
-                SELECT la.id, la.loan_reference, u.full_name, m.member_number,
+                SELECT la.id, la.loan_reference, m.id AS member_id, u.full_name, m.member_number,
                        lp.name AS product_name, la.status,
                        la.principal_amount,
                        la.principal_balance + la.accrued_interest + la.penalty_balance AS total_outstanding,
@@ -215,6 +215,7 @@ public class LoanAccountJdbcAdapter implements LoanAccountRepository {
                 (rs, row) -> new LoanSummaryRow(
                         UUID.fromString(rs.getString("id")),
                         rs.getString("loan_reference"),
+                        UUID.fromString(rs.getString("member_id")),
                         rs.getString("full_name"),
                         rs.getString("member_number"),
                         rs.getString("product_name"),

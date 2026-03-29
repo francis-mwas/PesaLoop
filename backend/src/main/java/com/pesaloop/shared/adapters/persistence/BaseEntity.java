@@ -50,6 +50,6 @@ public abstract class BaseEntity {
     private UUID updatedBy;
 
     @Version
-    @Column(name = "version", nullable = false)
-    private Long version = 0L;
+    @Column(name = "version")          // nullable — null means brand-new entity (PERSIST not MERGE)
+    private Long version;
 }

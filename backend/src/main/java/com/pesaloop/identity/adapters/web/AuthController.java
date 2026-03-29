@@ -72,8 +72,23 @@ public class AuthController {
                 req.groupId() != null ? UUID.fromString(req.groupId()) : null);
 
         if (result.requiresGroupSelection()) {
+            // If user has no groups yet, issue a limited token so they can create one
+            if (result.availableGroups().isEmpty()) {
+                String setupToken = jwtTokenProvider.generateToken(
+                        result.userId(), null, "MEMBER");
+                return ResponseEntity.ok(ApiResponse.success(
+                        Map.of("requiresGroupSelection", true,
+                                "availableGroups", result.availableGroups(),
+                                "userId", result.userId(),
+                                "fullName", result.fullName(),
+                                "token", setupToken),
+                        "Please create your first group to continue"));
+            }
             return ResponseEntity.ok(ApiResponse.success(
-                    Map.of("requiresGroupSelection", true, "availableGroups", result.availableGroups()),
+                    Map.of("requiresGroupSelection", true,
+                            "availableGroups", result.availableGroups(),
+                            "userId", result.userId(),
+                            "fullName", result.fullName()),
                     "Select a group to continue"));
         }
 

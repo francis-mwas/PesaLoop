@@ -6,6 +6,7 @@ import com.pesaloop.contribution.application.port.in.GetMonthlyLedgerPort;
 import com.pesaloop.contribution.application.port.in.GetYearSummaryPort;
 import com.pesaloop.contribution.application.port.in.GetYearSummaryPort.YearSummaryResult;
 import com.pesaloop.contribution.application.port.out.MemberStatementRepository;
+import com.pesaloop.group.application.port.out.MemberQueryRepository;
 import com.pesaloop.contribution.application.port.out.MemberStatementRepository.*;
 import com.pesaloop.contribution.application.usecase.MonthlyLedgerUseCase.MonthlyLedgerResponse;
 import com.pesaloop.shared.adapters.web.ApiResponse;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -37,6 +39,7 @@ public class ReportController {
     private final GetGroupStatsPort       groupStatsUseCase;
     private final GetYearSummaryPort      yearSummaryUseCase;
     private final MemberStatementRepository memberStatementRepository;
+    private final MemberQueryRepository memberQueryRepository;
 
     // ── Monthly ledger ────────────────────────────────────────────────────
 
@@ -51,10 +54,20 @@ public class ReportController {
     // ── Member statement ──────────────────────────────────────────────────
 
     @GetMapping("/member/{memberId}/statement")
-    @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','TREASURER','AUDITOR','MEMBER')")
     public ResponseEntity<ApiResponse<MemberStatement>> memberStatement(
-            @PathVariable UUID memberId) {
+            @PathVariable UUID memberId,
+            @AuthenticationPrincipal String userId) {
         UUID groupId = TenantContext.getGroupId();
+        // MEMBER role can only view their own statement
+        if ("MEMBER".equals(TenantContext.getRole())) {
+            UUID callerMemberId = memberQueryRepository.findMemberIdByUserId(
+                    UUID.fromString(userId), groupId).orElse(null);
+            if (!memberId.equals(callerMemberId)) {
+                return ResponseEntity.status(403)
+                        .body(ApiResponse.error("You can only view your own statement", "FORBIDDEN"));
+            }
+        }
         MemberProfile        profile       = memberStatementRepository.findMemberProfile(memberId, groupId);
         List<ContributionLine> contributions = memberStatementRepository.findContributions(memberId, groupId);
         List<LoanLine>         loans         = memberStatementRepository.findLoans(memberId, groupId);

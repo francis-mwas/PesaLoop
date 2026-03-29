@@ -102,7 +102,7 @@ public interface LoanAccountRepository {
 
     record LoanSummaryRow(
             UUID loanId, String loanReference,
-            String memberName, String memberNumber,
+            UUID memberId, String memberName, String memberNumber,
             String productName, String status,
             BigDecimal principalAmount, BigDecimal totalOutstanding,
             LocalDate dueDate, boolean overdue

@@ -6,6 +6,7 @@ import com.pesaloop.contribution.application.port.in.InitiateStkPushPort;
 import com.pesaloop.contribution.application.port.in.RecordContributionPort;
 import com.pesaloop.contribution.application.port.out.ContributionCycleManagementRepository;
 import com.pesaloop.contribution.application.port.out.ContributionEntryRepository;
+import com.pesaloop.contribution.application.port.out.ContributionEntryRepository.EntryPayment;
 import com.pesaloop.contribution.domain.model.ContributionEntry;
 import com.pesaloop.contribution.application.port.out.ContributionCycleManagementRepository.CycleSummaryRow;
 import com.pesaloop.contribution.application.port.out.ContributionCycleManagementRepository.OpenCycleResult;
@@ -137,6 +138,18 @@ public class ContributionController {
                 ))
                 .toList();
         return ResponseEntity.ok(ApiResponse.success(rows));
+    }
+
+    // ── Per-entry payment breakdown ───────────────────────────────────────────
+
+    @GetMapping("/cycles/{cycleId}/entries/{memberId}/payments")
+    @PreAuthorize("hasAnyRole('ADMIN','TREASURER','SECRETARY','AUDITOR','MEMBER')")
+    public ResponseEntity<ApiResponse<List<EntryPayment>>> getEntryPayments(
+            @PathVariable UUID cycleId,
+            @PathVariable UUID memberId) {
+        UUID groupId = TenantContext.getGroupId();
+        List<EntryPayment> payments = entryRepository.findPaymentsByEntryMember(cycleId, memberId, groupId);
+        return ResponseEntity.ok(ApiResponse.success(payments));
     }
 
     public record CycleEntryRow(

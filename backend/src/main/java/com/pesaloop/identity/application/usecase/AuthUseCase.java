@@ -37,7 +37,7 @@ public class AuthUseCase implements RegisterUserPort, LoginPort, OtpPort, Invite
 
     @Transactional
     public RegisterResult register(String phoneNumber, String fullName,
-                                    String password, String email) {
+                                   String password, String email) {
         String phone = validator.normalizePhone(phoneNumber);
 
         if (userRepository.existsByPhone(phone)) {
@@ -65,6 +65,8 @@ public class AuthUseCase implements RegisterUserPort, LoginPort, OtpPort, Invite
 
         int otp = 100000 + new Random().nextInt(900000);
         userRepository.createOtpRequest(phone, passwordEncoder.encode(String.valueOf(otp)), purpose);
+        // Always log OTP — essential for dev/testing when no SMS gateway is configured
+        log.info("OTP generated: phone={} purpose={} code={}", phone, purpose, otp);
         smsService.sendOtp(phone, otp, purpose);
     }
 

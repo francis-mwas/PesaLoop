@@ -46,7 +46,7 @@ public class AfricasTalkingGateway implements SmsGateway {
     @Override
     public boolean send(String phone, String message) {
         if (!StringUtils.hasText(apiKey)) {
-            log.warn("SMS not sent (no API key). To: {} | {}", phone, message);
+            log.info("SMS skipped (no API key configured — expected in dev). To: {}", phone);
             return false;
         }
 

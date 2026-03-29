@@ -42,12 +42,13 @@ public class JwtTokenProvider {
         Instant now = Instant.now();
         Instant expiry = now.plus(expiryHours, ChronoUnit.HOURS);
 
+        java.util.Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("role", role);
+        if (groupId != null) claims.put("group_id", groupId.toString());
+
         return Jwts.builder()
                 .subject(userId.toString())
-                .claims(Map.of(
-                        "group_id", groupId.toString(),
-                        "role", role
-                ))
+                .claims(claims)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(signingKey)
