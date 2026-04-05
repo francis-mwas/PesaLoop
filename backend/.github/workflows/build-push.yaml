@@ -1,0 +1,205 @@
+# =============================================================================
+# PesaLoop Backend — Build, Push & Deploy Pipeline
+#
+# Triggers:
+#   - Push to main → builds image, deploys to DEV automatically
+#   - Push of version tag (v*) → deploys to STAGING automatically
+#   - Manual trigger → choose environment to deploy to
+#
+# What it does:
+#   1. Builds your Spring Boot Docker image
+#   2. Pushes to GitHub Container Registry (ghcr.io)
+#   3. Updates the image tag in your deployments repo
+#   4. ArgoCD picks up the change and deploys automatically
+#
+# Setup required (one time):
+#   Go to PesaLoop repo → Settings → Secrets and variables → Actions
+#   Add these secrets:
+#     DEPLOYMENTS_TOKEN  → GitHub PAT with repo write access to deployments repo
+#                          (Settings → Developer settings → Personal access tokens)
+#                          Scopes needed: repo, write:packages, read:packages
+# =============================================================================
+
+name: Build, Push and Deploy
+
+on:
+  push:
+    branches:
+      - main          # triggers dev deployment
+    tags:
+      - 'v*'          # triggers staging deployment (e.g. v1.0.0, v1.2.3)
+  workflow_dispatch:  # allows manual trigger from GitHub Actions UI
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/francis-mwas/pesaloop-backend
+
+jobs:
+  # ── Job 1: Build and push Docker image ─────────────────────────────────────
+  build-and-push:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write  # needed to push to ghcr.io
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+      full-image: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout PesaLoop source code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        # Buildx enables faster builds with caching
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN is automatic — no manual setup needed for this step
+
+      - name: Generate image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            # On push to main → tag as dev-latest and dev-<short-sha>
+            type=raw,value=dev-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,prefix=dev-,enable=${{ github.ref == 'refs/heads/main' }}
+            # On version tag push → tag as v1.0.0 and latest
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend    # your backend folder with the Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha   # use GitHub Actions cache to speed up builds
+          cache-to: type=gha,mode=max
+
+      - name: Print image details
+        run: |
+          echo "Image pushed: ${{ env.IMAGE_NAME }}"
+          echo "Tags: ${{ steps.meta.outputs.tags }}"
+
+  # ── Job 2: Update deployments repo to trigger ArgoCD ───────────────────────
+  deploy-dev:
+    name: Deploy to dev
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Only run on push to main branch
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout deployments repo
+        uses: actions/checkout@v4
+        with:
+          repository: francis-mwas/deployments
+          token: ${{ secrets.DEPLOYMENTS_TOKEN }}
+          # DEPLOYMENTS_TOKEN is a PAT you create manually (see setup above)
+
+      - name: Update dev image tag
+        run: |
+          # Get the short SHA for a specific tag (not just dev-latest)
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          NEW_TAG="dev-${SHORT_SHA}"
+
+          echo "Updating dev image tag to: ${NEW_TAG}"
+
+          # Replace the image tag in the dev kustomization file
+          sed -i "s|newTag: dev-.*|newTag: ${NEW_TAG}|" \
+            pesaloop/overlays/dev/kustomization.yaml
+
+          # Verify the change
+          grep "newTag" pesaloop/overlays/dev/kustomization.yaml
+
+      - name: Commit and push to deployments repo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add pesaloop/overlays/dev/kustomization.yaml
+
+          git commit -m "ci: deploy pesaloop-backend dev-$(echo '${{ github.sha }}' | cut -c1-7)
+
+          Source: ${{ github.repository }}@${{ github.sha }}
+          Triggered by: ${{ github.actor }}
+          Workflow: ${{ github.workflow }}"
+
+          git push
+
+      - name: Summary
+        run: |
+          echo "Dev deployment triggered"
+          echo "ArgoCD will pick up the change within 3 minutes"
+          echo "Monitor at: https://localhost:9090/applications/pesaloop-backend-dev"
+
+  # ── Job 3: Deploy to staging on version tag ─────────────────────────────────
+  deploy-staging:
+    name: Deploy to staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Only run when a version tag is pushed (e.g. v1.0.0)
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout deployments repo
+        uses: actions/checkout@v4
+        with:
+          repository: francis-mwas/deployments
+          token: ${{ secrets.DEPLOYMENTS_TOKEN }}
+
+      - name: Update staging image tag
+        run: |
+          # Extract the version from the git tag (e.g. refs/tags/v1.0.0 → v1.0.0)
+          VERSION="${{ github.ref_name }}"
+          echo "Updating staging image tag to: ${VERSION}"
+
+          sed -i "s|newTag: .*|newTag: ${VERSION}|" \
+            pesaloop/overlays/staging/kustomization.yaml
+
+          grep "newTag" pesaloop/overlays/staging/kustomization.yaml
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add pesaloop/overlays/staging/kustomization.yaml
+
+          git commit -m "ci: deploy pesaloop-backend ${{ github.ref_name }} to staging
+
+          Source: ${{ github.repository }}@${{ github.sha }}
+          Tag: ${{ github.ref_name }}
+          Triggered by: ${{ github.actor }}"
+
+          git push
+
+      - name: Summary
+        run: |
+          echo "Staging deployment triggered for ${{ github.ref_name }}"
+          echo "ArgoCD will sync staging within 3 minutes"
+          echo ""
+          echo "To deploy to production:"
+          echo "1. Open a PR updating pesaloop/overlays/production/kustomization.yaml"
+          echo "2. Change newTag to ${{ github.ref_name }}"
+          echo "3. Get approval and merge"
+          echo "4. Go to ArgoCD UI → pesaloop-backend-production → Sync"
